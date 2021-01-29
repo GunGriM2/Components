@@ -1,20 +1,29 @@
 <?php
 
-class Database {
+class Database 
+{
+
     private static $instance = null;
     private $pdo, $query, $error = false, $results, $count;
 
-    private function __construct() {
-        try {
-            $this->pdo = new PDO("mysql:host=" . Config::get('mysql.host') . ";dbname=" . Config::get('mysql.database'), Config::get('mysql.username'), Config::get('mysql.password'));
-        } catch (PDOException $exception) {
+    private function __construct() 
+    {
+        try
+        {
+            $this->pdo = new PDO('mysql:host='. Config::get("mysql.host") . 
+                                '; dbname=' . Config::get("mysql.database"), 
+                                Config::get("mysql.username"), 
+                                Config::get("mysql.password"));
+        } catch (PDOException $exception) 
+        {
             die($exception->getMessage());
         }
     }
 
-    public static function getInstance() {
-
-        if(!isset(self::$instance)) {
+    public static function getInstance() 
+    {
+        if (!isset(self::$instance)) 
+        {
             self::$instance = new Database;
         }
 
@@ -23,27 +32,28 @@ class Database {
 
     public function query($sql, $params = [])
     {
+        $this->error = false;
+        $this->query = $this->pdo->prepare($sql);
 
-       $this->error = false;
-       $this->query = $this->pdo->prepare($sql);
+        if (count($params))
+        {
+            $i = 1;
+            foreach ($params as $param) 
+            {
+                $this->query->bindValue($i++, $param);                
+            }
+        }
 
-       if(count($params)) {
-           $i = 1;
-           foreach($params as $param) {
-               $this->query->bindValue($i, $param);
-               $i++;
-           }
-       }
+        if ($this->query->execute() === false)
+        {
+            $this->error = true;
+        } else
+        {
+            $this->results = $this->query->fetchAll(PDO::FETCH_OBJ);
+            $this->count = $this->query->rowCount();
+        }
 
-
-       if(!$this->query->execute()) {
-           $this->error = true;
-       } else {
-           $this->results = $this->query->fetchAll(PDO::FETCH_OBJ);
-           $this->count = $this->query->rowCount();
-       }
-
-       return $this;
+        return $this;
     }
 
     public function error()
@@ -62,70 +72,67 @@ class Database {
     }
 
     public function get($table, $where = [])
-    {
-        return $this->action('SELECT *', $table, $where);
+    {    
+        return $this->action("SELECT *", $table, $where);
     }
 
     public function delete($table, $where = [])
-    {
-        return $this->action('DELETE', $table, $where);
+    {    
+        return $this->action("DELETE", $table, $where);
     }
 
-    public function action($action, $table, $where = [])
-    {
-        if(count($where) === 3) {
-
-            $operators = ['=', '>', '<', '>=', '<='];
+    private function action($action, $table, $where = [])
+    {    
+        if (count($where) === 3) 
+        {
+            $operators = ['=' , '>' , '<' , '>=' , '<='];
 
             $field = $where[0];
             $operator = $where[1];
             $value = $where[2];
-
-            if(in_array($operator, $operators)) {
-
-                $sql = "{$action} FROM {$table} WHERE {$field} {$operator} ?";
-                if(!$this->query($sql, [$value])->error()) { //true если есть ошибка
+    
+            if (in_array($operator, $operators)) 
+            {
+                $sql = "{$action} FROM `{$table}` WHERE {$field} {$operator} ? ";
+                if (!$this->query($sql, [$value])->error())
+                {
                     return $this;
                 }
             }
         }
-
         return false;
     }
 
     public function insert($table, $fields = [])
-    {
+    {    
         $values = '';
-        foreach($fields as $field) {
+        foreach ($fields as $field) 
+        {
             $values .= "?,";
         }
         $val = rtrim($values, ',');
 
-
         $sql = "INSERT INTO {$table} (" . '`' . implode('`, `', array_keys($fields)) . '`' . ") VALUES ({$val})";
 
-        if(!$this->query($sql, $fields)->error()) {
+        if (!$this->query($sql, $fields)->error())
             return true;
-        }
+        
         return false;
-
     }
 
     public function update($table, $id, $fields = [])
-    {
+    {    
         $set = '';
-        foreach($fields as $key => $field) {
-            $set .= "{$key} = ?,"; // username = ?, password = ?,
+        foreach ($fields as $key => $field) {
+            $set .= "{$key} = ?,";
         }
-
-        $set = rtrim($set, ','); // username = ?, password = ?
+        $set = rtrim($set, ',');
 
         $sql = "UPDATE {$table} SET {$set} WHERE id = {$id}";
 
-        if(!$this->query($sql, $fields)->error()){
+        if (!$this->query($sql, $fields)->error())
             return true;
-        }
-
+        
         return false;
     }
 
@@ -134,3 +141,5 @@ class Database {
         return $this->results()[0];
     }
 }
+
+?>
